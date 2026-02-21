@@ -60,5 +60,5 @@ class RecreationGovAdapter(BaseAdapter):
 
     # ── Availability (stub — implemented in Task 4) ────────────────────────────
 
-    def get_available_sites(self, park_name: str, date_ranges: list) -> list:
+    def get_available_sites(self, park_name: str, date_ranges: list[dict]) -> list["Site"]:
         raise NotImplementedError
