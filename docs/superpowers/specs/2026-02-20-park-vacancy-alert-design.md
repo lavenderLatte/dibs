@@ -38,6 +38,8 @@ A free, automated system that monitors Recreation.gov for cabin and accommodatio
 repo-root/
 ├── config.yaml                  ← user edits to add/remove monitors
 ├── state.json                   ← auto-managed, tracks seen vacancies
+├── cache/
+│   └── park_lookup.json         ← auto-managed, RIDB results cached 24h
 ├── main.py                      ← entry point, orchestrates everything
 ├── notifier.py                  ← Gmail + ntfy.sh, quiet hours, dedup
 ├── adapters/
@@ -93,7 +95,7 @@ targets:
 
 ### Park Name → Campground IDs
 
-The RIDB API (Recreation.gov's official free API, requires a free API key) is used to look up all campground/facility IDs within a named national park. This lookup result is cached locally to avoid repeated API calls.
+The RIDB API (Recreation.gov's official free API, requires a free API key) is used to look up all campground/facility IDs within a named national park. This lookup result is cached in `cache/park_lookup.json` with a 24-hour TTL to avoid repeated API calls. The cache file is committed to the repo alongside `state.json`.
 
 ### Availability Check
 
@@ -108,11 +110,11 @@ All available accommodations (cabins, tent cabins, rooms, etc.) across all campg
 
 ### State Tracking
 
-`state.json` is a living snapshot of currently open vacancies that have been alerted:
+`state.json` is a living snapshot of currently open vacancies that have been alerted. Keys are scoped to `{site_id}_{start_date}_{end_date}` so the same physical site watched across multiple date ranges is tracked independently (each with its own 24h dedup timer):
 
 ```json
 {
-  "site_123": {
+  "site_123_2025-07-03_2025-07-05": {
     "first_alerted": "2026-02-20T10:00:00",
     "park": "Yosemite National Park",
     "name": "Curry Village Cabin #4",
