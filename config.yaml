@@ -1,0 +1,15 @@
+notifications:
+  email: you@gmail.com
+  # ntfy_topic and Gmail credentials come from GitHub Secrets (NTFY_TOPIC,
+  # GMAIL_ADDRESS, GMAIL_APP_PASSWORD) — do not put them here.
+  timezone: "America/Los_Angeles"
+  quiet_hours:
+    start: "23:00"
+    end: "06:00"
+
+targets:
+  - park: "Yosemite National Park"
+    active: true
+    date_ranges:
+      - start: "2025-07-01"
+        end: "2025-07-07"
