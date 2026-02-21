@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -8,13 +8,13 @@ class Site:
     campground_id: str
     name: str
     park: str
-    available_dates: list
+    available_dates: list[str]
     url: str
 
 
 class BaseAdapter(ABC):
     @abstractmethod
-    def get_available_sites(self, park_name: str, date_ranges: list) -> list:
+    def get_available_sites(self, park_name: str, date_ranges: list[dict]) -> list["Site"]:
         """
         Returns a list of Site objects available within any of the given date ranges.
 
