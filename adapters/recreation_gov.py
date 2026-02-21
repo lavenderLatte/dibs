@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 
 import requests
 
@@ -58,7 +58,70 @@ class RecreationGovAdapter(BaseAdapter):
         with open(CACHE_FILE, "w") as f:
             json.dump(cache, f, indent=2)
 
-    # ── Availability (stub — implemented in Task 4) ────────────────────────────
+    # ── Availability ───────────────────────────────────────────────────────────
 
     def get_available_sites(self, park_name: str, date_ranges: list[dict]) -> list["Site"]:
-        raise NotImplementedError
+        campground_ids = self.get_campground_ids(park_name)
+        sites = []
+        for cgid in campground_ids:
+            sites.extend(self._check_campground(cgid, park_name, date_ranges))
+        return sites
+
+    def _check_campground(self, campground_id: str, park_name: str, date_ranges: list) -> list:
+        months = self._months_to_query(date_ranges)
+        raw_sites = {}
+
+        for month_start in months:
+            try:
+                resp = requests.get(
+                    f"{AVAIL_BASE}/{campground_id}/month",
+                    params={"start_date": f"{month_start.isoformat()}T00:00:00.000Z"},
+                )
+                resp.raise_for_status()
+                for site_id, data in resp.json().get("campsites", {}).items():
+                    if site_id not in raw_sites:
+                        raw_sites[site_id] = {"meta": data, "avail": {}}
+                    raw_sites[site_id]["avail"].update(data.get("availabilities", {}))
+            except requests.RequestException:
+                continue
+
+        result = []
+        for site_id, entry in raw_sites.items():
+            available_dates = [
+                dt_str[:10]
+                for dt_str, status in entry["avail"].items()
+                if status == "Available" and self._in_any_range(dt_str[:10], date_ranges)
+            ]
+            if available_dates:
+                result.append(
+                    Site(
+                        site_id=site_id,
+                        campground_id=campground_id,
+                        name=entry["meta"].get("site", f"Site {site_id}"),
+                        park=park_name,
+                        available_dates=sorted(available_dates),
+                        url=f"https://www.recreation.gov/camping/campsites/{site_id}",
+                    )
+                )
+        return result
+
+    def _months_to_query(self, date_ranges: list) -> list:
+        months = set()
+        for dr in date_ranges:
+            d = date.fromisoformat(dr["start"]).replace(day=1)
+            end = date.fromisoformat(dr["end"])
+            while d <= end:
+                months.add(d)
+                # advance to first day of next month
+                if d.month == 12:
+                    d = d.replace(year=d.year + 1, month=1)
+                else:
+                    d = d.replace(month=d.month + 1)
+        return sorted(months)
+
+    def _in_any_range(self, date_str: str, date_ranges: list) -> bool:
+        night = date.fromisoformat(date_str)
+        return any(
+            date.fromisoformat(dr["start"]) <= night < date.fromisoformat(dr["end"])
+            for dr in date_ranges
+        )
