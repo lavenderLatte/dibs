@@ -1,7 +1,6 @@
 notifications:
-  email: you@gmail.com
-  # ntfy_topic and Gmail credentials come from GitHub Secrets (NTFY_TOPIC,
-  # GMAIL_ADDRESS, GMAIL_APP_PASSWORD) — do not put them here.
+  # email, app_password, and ntfy_topic come from GitHub Secrets:
+  # GMAIL_ADDRESS, GMAIL_APP_PASSWORD, NTFY_TOPIC
   timezone: "America/Los_Angeles"
   quiet_hours:
     start: "23:00"
@@ -13,3 +12,9 @@ targets:
     date_ranges:
       - start: "2025-07-01"
         end: "2025-07-07"
+
+  - park: "Zion National Park"
+    active: true
+    date_ranges:
+      - start: "2026-04-13"
+        end: "2026-04-15"

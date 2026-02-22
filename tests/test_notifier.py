@@ -114,8 +114,6 @@ def test_send_push_raises_on_http_error(mocker):
 
 CONFIG = {
     "notifications": {
-        "email": "to@example.com",
-        "ntfy_topic": "my-topic",
         "timezone": "America/Los_Angeles",
     }
 }
@@ -177,7 +175,6 @@ def test_send_alert_reads_quiet_hours_from_config(mocker):
     """send_alert passes parsed quiet_hours to is_quiet_hours instead of hardcoded values."""
     config_with_qh = {
         "notifications": {
-            "email": "to@example.com",
             "timezone": "America/Los_Angeles",
             "quiet_hours": {"start": "22:00", "end": "07:00"},
         }

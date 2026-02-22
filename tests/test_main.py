@@ -24,8 +24,6 @@ FIXTURE_SITE_BOTH_RANGES = Site(
 
 CONFIG = {
     "notifications": {
-        "email": "to@example.com",
-        "ntfy_topic": "my-topic",
         "timezone": "America/Los_Angeles",
     },
     "targets": [

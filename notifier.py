@@ -95,7 +95,7 @@ def send_alert(config: dict, creds: dict, vacancies: list, force: bool = False):
     email_body, push_body = format_vacancies(vacancies)
     first_url = vacancies[0]["url"]
 
-    send_email(creds["gmail_address"], creds["app_password"], notif["email"], subject, email_body)
+    send_email(creds["gmail_address"], creds["app_password"], creds["gmail_address"], subject, email_body)
 
     qh = notif.get("quiet_hours") or {}
     qs = int(qh["start"].split(":")[0]) if qh.get("start") else QUIET_START
