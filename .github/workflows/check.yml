@@ -1,0 +1,40 @@
+name: Check Park Vacancies
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to commit state.json back
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run vacancy checker
+        env:
+          RIDB_API_KEY: ${{ secrets.RIDB_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python main.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state.json cache/
+          git diff --staged --quiet || git commit -m "chore: update vacancy state [skip ci]"
+          git push
