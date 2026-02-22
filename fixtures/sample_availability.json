@@ -1,0 +1,12 @@
+{
+  "Yosemite National Park": [
+    {
+      "site_id": "fixture_001",
+      "campground_id": "232447",
+      "name": "Curry Village Cabin #4",
+      "park": "Yosemite National Park",
+      "available_dates": ["2025-07-03", "2025-07-04"],
+      "url": "https://www.recreation.gov/camping/campsites/fixture_001"
+    }
+  ]
+}
