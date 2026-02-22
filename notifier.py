@@ -44,3 +44,53 @@ def format_vacancies(vacancies: list) -> tuple:
         push_body = f"{first['name']} ({first['dates']}) + {count - 1} more\n{first['url']}"
 
     return email_body, push_body
+
+
+def send_email(gmail_address: str, app_password: str, to: str, subject: str, body: str):
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = gmail_address
+    msg["To"] = to
+    msg.attach(MIMEText(body, "plain"))
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(gmail_address, app_password)
+        server.sendmail(gmail_address, to, msg.as_string())
+
+
+def send_push(ntfy_topic: str, title: str, body: str, url: str = None):
+    headers = {"Title": title}
+    if url:
+        headers["Click"] = url
+    requests.post(
+        f"https://ntfy.sh/{ntfy_topic}",
+        data=body.encode("utf-8"),
+        headers=headers,
+    )
+
+
+def send_alert(config: dict, creds: dict, vacancies: list, force: bool = False):
+    """
+    Send a merged alert for all vacancies.
+
+    Args:
+        config: full config dict (needs config["notifications"])
+        creds: {"gmail_address", "app_password", "ntfy_topic"}
+        vacancies: list of vacancy dicts {park, name, dates, url}
+        force: if True, bypass quiet hours (used by --test-notify)
+    """
+    if not vacancies:
+        return
+
+    notif = config["notifications"]
+    park_name = vacancies[0]["park"]
+    count = len(vacancies)
+    subject = f"\U0001f3d5 Vacancy Alert \u2014 {park_name}"
+    push_title = f"\U0001f3d5 {park_name} \u2014 {count} vacanc{'ies' if count > 1 else 'y'} found"
+    email_body, push_body = format_vacancies(vacancies)
+    first_url = vacancies[0]["url"]
+
+    send_email(creds["gmail_address"], creds["app_password"], notif["email"], subject, email_body)
+
+    quiet = is_quiet_hours(notif["timezone"]) if not force else False
+    if not quiet:
+        send_push(creds["ntfy_topic"], push_title, push_body, first_url)

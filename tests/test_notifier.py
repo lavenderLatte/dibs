@@ -57,3 +57,99 @@ def test_format_multiple_vacancies_push_summarizes():
     _, push_body = format_vacancies([VACANCY_1, VACANCY_2])
     assert "Cabin #1" in push_body
     assert "+ 1 more" in push_body
+
+
+# ── Email delivery ─────────────────────────────────────────────────────────────
+
+def test_send_email_calls_smtp_with_correct_args(mocker):
+    mock_smtp_cls = mocker.patch("notifier.smtplib.SMTP_SSL")
+    mock_server = mocker.MagicMock()
+    mock_smtp_cls.return_value.__enter__ = mocker.MagicMock(return_value=mock_server)
+    mock_smtp_cls.return_value.__exit__ = mocker.MagicMock(return_value=False)
+
+    from notifier import send_email
+    send_email("sender@gmail.com", "apppass", "to@example.com", "Subject", "Body")
+
+    mock_smtp_cls.assert_called_once_with("smtp.gmail.com", 465)
+    mock_server.login.assert_called_once_with("sender@gmail.com", "apppass")
+    mock_server.sendmail.assert_called_once()
+    _, call_args, _ = mock_server.sendmail.mock_calls[0]
+    assert call_args[0] == "sender@gmail.com"
+    assert call_args[1] == "to@example.com"
+
+
+# ── Push delivery ──────────────────────────────────────────────────────────────
+
+def test_send_push_posts_to_ntfy(mocker):
+    mock_post = mocker.patch("notifier.requests.post")
+    from notifier import send_push
+    send_push("my-topic", "Alert Title", "Alert body", "https://rec.gov/1")
+
+    mock_post.assert_called_once()
+    url = mock_post.call_args[0][0]
+    assert "ntfy.sh/my-topic" in url
+    assert mock_post.call_args[1]["headers"]["Title"] == "Alert Title"
+    assert mock_post.call_args[1]["headers"]["Click"] == "https://rec.gov/1"
+
+
+# ── send_alert integration ─────────────────────────────────────────────────────
+
+CONFIG = {
+    "notifications": {
+        "email": "to@example.com",
+        "ntfy_topic": "my-topic",
+        "timezone": "America/Los_Angeles",
+    }
+}
+CREDS = {
+    "gmail_address": "sender@gmail.com",
+    "app_password": "apppass",
+    "ntfy_topic": "my-topic",
+}
+
+
+def test_send_alert_sends_email_and_push_outside_quiet(mocker):
+    mocker.patch("notifier.is_quiet_hours", return_value=False)
+    mock_email = mocker.patch("notifier.send_email")
+    mock_push = mocker.patch("notifier.send_push")
+
+    from notifier import send_alert
+    send_alert(CONFIG, CREDS, [VACANCY_1])
+
+    mock_email.assert_called_once()
+    mock_push.assert_called_once()
+
+
+def test_send_alert_suppresses_push_during_quiet_hours(mocker):
+    mocker.patch("notifier.is_quiet_hours", return_value=True)
+    mock_email = mocker.patch("notifier.send_email")
+    mock_push = mocker.patch("notifier.send_push")
+
+    from notifier import send_alert
+    send_alert(CONFIG, CREDS, [VACANCY_1])
+
+    mock_email.assert_called_once()
+    mock_push.assert_not_called()
+
+
+def test_send_alert_force_bypasses_quiet_hours(mocker):
+    mocker.patch("notifier.is_quiet_hours", return_value=True)
+    mock_email = mocker.patch("notifier.send_email")
+    mock_push = mocker.patch("notifier.send_push")
+
+    from notifier import send_alert
+    send_alert(CONFIG, CREDS, [VACANCY_1], force=True)
+
+    mock_email.assert_called_once()
+    mock_push.assert_called_once()
+
+
+def test_send_alert_does_nothing_for_empty_vacancies(mocker):
+    mock_email = mocker.patch("notifier.send_email")
+    mock_push = mocker.patch("notifier.send_push")
+
+    from notifier import send_alert
+    send_alert(CONFIG, CREDS, [])
+
+    mock_email.assert_not_called()
+    mock_push.assert_not_called()
