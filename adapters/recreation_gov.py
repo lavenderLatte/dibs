@@ -82,7 +82,7 @@ class RecreationGovAdapter(BaseAdapter):
                     if site_id not in raw_sites:
                         raw_sites[site_id] = {"meta": data, "avail": {}}
                     raw_sites[site_id]["avail"].update(data.get("availabilities", {}))
-            except requests.RequestException:
+            except (requests.RequestException, json.JSONDecodeError):
                 continue
 
         result = []

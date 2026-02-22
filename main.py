@@ -2,9 +2,11 @@ import argparse
 import json
 import os
 import sys
+from datetime import date as _date
 
 import yaml
 
+from adapters.base import Site
 from adapters.recreation_gov import RecreationGovAdapter
 from notifier import send_alert
 from state import (
@@ -17,6 +19,13 @@ from state import (
     reset_timer,
     remove_gone_vacancies,
 )
+
+
+def _site_in_range(site, dr: dict) -> bool:
+    """Returns True if the site has any available dates within this date range."""
+    start = _date.fromisoformat(dr["start"])
+    end = _date.fromisoformat(dr["end"])
+    return any(start <= _date.fromisoformat(d) < end for d in site.available_dates)
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -51,7 +60,6 @@ def run(config: dict, creds: dict, state: dict, dry_run: bool, test_notify: bool
             with open("fixtures/sample_availability.json") as f:
                 fixture = json.load(f)
             raw_sites = fixture.get(park, [])
-            from adapters.base import Site
             sites = [Site(**s) for s in raw_sites]
         else:
             try:
@@ -62,6 +70,8 @@ def run(config: dict, creds: dict, state: dict, dry_run: bool, test_notify: bool
 
         for site in sites:
             for dr in date_ranges:
+                if not _site_in_range(site, dr):
+                    continue
                 key = make_key(site.site_id, dr["start"], dr["end"])
                 current_keys.add(key)
                 vacancy_info = {

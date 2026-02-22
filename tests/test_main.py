@@ -12,6 +12,16 @@ FIXTURE_SITE = Site(
     url="https://www.recreation.gov/camping/campsites/fixture_001",
 )
 
+# Same site but with availability spanning two date ranges (July and August)
+FIXTURE_SITE_BOTH_RANGES = Site(
+    site_id="fixture_001",
+    campground_id="232447",
+    name="Curry Village Cabin #4",
+    park="Yosemite National Park",
+    available_dates=["2025-07-03", "2025-07-04", "2025-08-02", "2025-08-03"],
+    url="https://www.recreation.gov/camping/campsites/fixture_001",
+)
+
 CONFIG = {
     "notifications": {
         "email": "to@example.com",
@@ -136,8 +146,8 @@ def test_adapter_error_skips_target(mocker):
     mock_alert.assert_not_called()
 
 
-def test_multiple_date_ranges_create_separate_keys_and_single_alert(mocker):
-    """Two date ranges for same park → two state keys, one merged alert."""
+def test_multiple_date_ranges_separate_keys_when_site_available_in_both(mocker):
+    """Site available in both ranges → two state keys, one merged alert."""
     config_two_ranges = {
         **CONFIG,
         "targets": [
@@ -152,7 +162,7 @@ def test_multiple_date_ranges_create_separate_keys_and_single_alert(mocker):
         ],
     }
     mock_adapter = MagicMock()
-    mock_adapter.get_available_sites.return_value = [FIXTURE_SITE]
+    mock_adapter.get_available_sites.return_value = [FIXTURE_SITE_BOTH_RANGES]
     mock_alert = mocker.patch("main.send_alert")
 
     from main import run
@@ -172,6 +182,43 @@ def test_multiple_date_ranges_create_separate_keys_and_single_alert(mocker):
     mock_alert.assert_called_once()
     vacancies_sent = mock_alert.call_args[0][2]
     assert len(vacancies_sent) == 2
+
+
+def test_no_false_positive_when_site_available_in_only_one_range(mocker):
+    """Site available only in first range → one state key, not two."""
+    config_two_ranges = {
+        **CONFIG,
+        "targets": [
+            {
+                "park": "Yosemite National Park",
+                "active": True,
+                "date_ranges": [
+                    {"start": "2025-07-01", "end": "2025-07-07"},
+                    {"start": "2025-08-01", "end": "2025-08-07"},
+                ],
+            }
+        ],
+    }
+    mock_adapter = MagicMock()
+    # FIXTURE_SITE only has July dates — no August availability
+    mock_adapter.get_available_sites.return_value = [FIXTURE_SITE]
+    mock_alert = mocker.patch("main.send_alert")
+
+    from main import run
+    final_state = run(
+        config=config_two_ranges,
+        creds=CREDS,
+        state={},
+        dry_run=False,
+        test_notify=False,
+        adapter=mock_adapter,
+    )
+
+    assert "fixture_001_2025-07-01_2025-07-07" in final_state
+    assert "fixture_001_2025-08-01_2025-08-07" not in final_state
+    mock_alert.assert_called_once()
+    vacancies_sent = mock_alert.call_args[0][2]
+    assert len(vacancies_sent) == 1
 
 
 def test_dry_run_does_not_write_state(mocker, tmp_path):

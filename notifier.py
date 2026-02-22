@@ -10,16 +10,21 @@ QUIET_START = 23  # 11 PM
 QUIET_END = 6     # 6 AM
 
 
-def is_quiet_hours(timezone_str: str, now: datetime = None) -> bool:
-    """Returns True if current time is within quiet hours (11pm–6am) in the given timezone."""
+def is_quiet_hours(
+    timezone_str: str,
+    now: datetime = None,
+    quiet_start: int = QUIET_START,
+    quiet_end: int = QUIET_END,
+) -> bool:
+    """Returns True if current time is within quiet hours in the given timezone."""
     tz = pytz.timezone(timezone_str)
     if now is None:
         now = datetime.now(tz)
     elif now.tzinfo is None:
         now = tz.localize(now)
     hour = now.hour
-    # Range wraps midnight: quiet if hour >= 23 OR hour < 6
-    return hour >= QUIET_START or hour < QUIET_END
+    # Range wraps midnight: quiet if hour >= quiet_start OR hour < quiet_end
+    return hour >= quiet_start or hour < quiet_end
 
 
 def format_vacancies(vacancies: list) -> tuple:
@@ -61,11 +66,12 @@ def send_push(ntfy_topic: str, title: str, body: str, url: str = None):
     headers = {"Title": title}
     if url:
         headers["Click"] = url
-    requests.post(
+    resp = requests.post(
         f"https://ntfy.sh/{ntfy_topic}",
         data=body.encode("utf-8"),
         headers=headers,
     )
+    resp.raise_for_status()
 
 
 def send_alert(config: dict, creds: dict, vacancies: list, force: bool = False):
@@ -91,6 +97,9 @@ def send_alert(config: dict, creds: dict, vacancies: list, force: bool = False):
 
     send_email(creds["gmail_address"], creds["app_password"], notif["email"], subject, email_body)
 
-    quiet = is_quiet_hours(notif["timezone"]) if not force else False
+    qh = notif.get("quiet_hours") or {}
+    qs = int(qh["start"].split(":")[0]) if qh.get("start") else QUIET_START
+    qe = int(qh["end"].split(":")[0]) if qh.get("end") else QUIET_END
+    quiet = is_quiet_hours(notif["timezone"], quiet_start=qs, quiet_end=qe) if not force else False
     if not quiet:
         send_push(creds["ntfy_topic"], push_title, push_body, first_url)
